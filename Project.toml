@@ -1,0 +1,9 @@
+name = "FITSUtils"
+uuid = "e3c3ba48-db7a-11e9-0297-7f801741554f"
+authors = ["linsj "]
+version = "0.1.0"
+
+[deps]
+FITSIO = "525bcba6-941b-5504-bd06-fd0dc1a4d2eb"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
