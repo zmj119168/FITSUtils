@@ -2,8 +2,10 @@ VERSION < v"0.1.0" && __precompile__()
 
 module FITSUtils
 export get_axis
+export get_galprop_axis
 export get_name_list
 export get_spectra
+export get_scatter
 
 using FITSIO
 using Printf
@@ -19,6 +21,25 @@ Get the grid array of a specified axis from an hdu header
 """
 function get_axis(header::FITSHeader, ind::Int)
   return map(i->header["CRVAL$ind"] + header["CDELT$ind"] * (i - 1), 1:header["NAXIS$ind"])
+end
+
+"""
+    get_galprop_axis(header::FITSHeader)
+
+Get the grid array of a axises from an GALPROP result hdu header
+
+# Arguments
+* `header`: the header.
+"""
+function get_galprop_axis(header::FITSHeader)
+  result = Dict{String,Array{Real,1}}()
+  pairs = header["NAXIS"] == 5 ? zip(["x", "y", "z", "E"], 1:4) : zip(["x", "E"], [1, 3])
+
+  for pair in pairs
+    result[pair[1]] = get_axis(header, pair[2])
+  end
+  result["E"] = map(e->10^e / 1e3, result["E"])
+  return result
 end
 
 """
@@ -69,6 +90,31 @@ function get_spectra(hdu::ImageHDU)
   result["eaxis"] = eaxis
 
   return result
+end
+
+function get_scatter(density::Array{T,4} where {T<:Real}, axis::Dict{String,Array{T,1}} where {T<:Real}, p::Real)
+  iup = findfirst(v->v>p, axis["E"])
+  iup = iup == nothing ? length(axis["E"]) : iup
+  iup = iup == 1 ? 2 : iup
+
+  ilow = iup - 1
+  plow, p, pup = log(axis["E"][ilow]), log(p), log(axis["E"][iup])
+  weights = [[ilow, (pup-p)/(pup-plow)], [iup, (p-plow)/(pup-plow)]]
+
+  cube = mapreduce(v->density[:,:,:,floor(Int, v[1])]*v[2], +, weights, init=zeros(typeof(density[1,1,1,1]),size(density)[1:3]))
+
+  scatters = Array{Array{Real,1},1}([[],[],[],[]])
+  resize!(scatters, 4)
+
+  for i in CartesianIndices(cube)
+    (cube[i] == 0) && continue
+    push!(scatters[1], axis["x"][i[1]])
+    push!(scatters[2], axis["y"][i[2]])
+    push!(scatters[3], axis["z"][i[3]])
+    push!(scatters[4], cube[i])
+  end
+
+  return scatters
 end
 
 end  # FITSUtils
