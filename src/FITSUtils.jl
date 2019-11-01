@@ -6,6 +6,7 @@ export get_galprop_axis
 export get_name_list
 export get_spectra
 export get_scatter
+export Particle
 
 using FITSIO
 using Printf
@@ -70,7 +71,6 @@ end
 function get_spectra(hdu::ImageHDU)
   header = read_header(hdu)
   data = read(hdu)
-
   nlist = get_name_list(header, 4)
 
   rsun = 8.3
@@ -81,13 +81,20 @@ function get_spectra(hdu::ImageHDU)
   wup = (rsun - xaxis[ilow]) / (xaxis[iup] - xaxis[ilow])
 
   spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,1,:,:], data[iup,1,:,:])
-  result = Dict{String,Array{Float64,1}}()
+  result = Dict{String,Particle}()
 
   eaxis = map(x->10^x / 1e3, get_axis(header, 3)) # [GeV]
   for i in 1:length(nlist)
-    result[nlist[i]] = map((e,f)->f / e^2 / 1e3, eaxis, spectra[:,i]) # MeV^2 cm^-2 sr^-1 s^-1 MeV^-1 -> cm^-2 sr^-1 s^-1 GeV^-1
+    index = @sprintf "%03d" i
+    iZ=header["NUCZ$index"]
+    iA=header["NUCA$index"]
+    m0 = iA == 0 ? 0.511e-3 : 0.9382
+    idnde = map((e,f)->f / e^2 / 1e3, eaxis, spectra[:,i]) # MeV^2 cm^-2 sr^-1 s^-1 MeV^-1 -> cm^-2 sr^-1 s^-1 GeV^-1
+    ip=@. sqrt((eaxis+m0)^2-m0^2)
+    ir=ip*iA/iZ # [GV]
+    idndr=@. idnde*(ip/sqrt(ip^2+m0^2))*(iZ/iA) # cm^-2 sr^-1 s^-1 GV^-1
+    result[nlist[i]] = Particle(idnde,ir,idndr,eaxis,iA,iZ)
   end
-  result["eaxis"] = eaxis
 
   return result
 end
@@ -115,6 +122,15 @@ function get_scatter(density::Array{T,4} where {T<:Real}, axis::Dict{String,Arra
   end
 
   return scatters
+end
+
+mutable struct Particle
+  dNdE::Array{T,1} where {T<:Real}
+  R::Array{T,1} where {T<:Real}
+  dNdR::Array{T,1} where {T<:Real}
+  Ekin::Array{T,1} where {T<:Real}
+  A::Int
+  Z::Int
 end
 
 end  # FITSUtils
