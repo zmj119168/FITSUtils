@@ -6,6 +6,7 @@ export get_galprop_axis
 export get_name_list
 export get_spectra
 export get_scatter
+export Particle
 
 using FITSIO
 using Printf
@@ -92,7 +93,7 @@ function get_spectra(hdu::ImageHDU)
     ip=@. sqrt((eaxis+m0)^2-m0^2)
     ir=ip*iA/iZ # [GV]
     idndr=@. idnde*(ip/sqrt(ip^2+m0^2))*(iZ/iA) # cm^-2 sr^-1 s^-1 GV^-1
-    result[nlist[i]] = Particle(eaxis,idnde,ir,idndr,iA,iZ)
+    result[nlist[i]] = Particle(idnde,ir,idndr,eaxis,iA,iZ)
   end
 
   return result
@@ -124,10 +125,10 @@ function get_scatter(density::Array{T,4} where {T<:Real}, axis::Dict{String,Arra
 end
 
 mutable struct Particle
-  Ekin::Array{T,1} where {T<:Real}
   dNdE::Array{T,1} where {T<:Real}
   R::Array{T,1} where {T<:Real}
   dNdR::Array{T,1} where {T<:Real}
+  Ekin::Array{T,1} where {T<:Real}
   A::Int
   Z::Int
 end
