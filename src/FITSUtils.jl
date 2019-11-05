@@ -6,10 +6,25 @@ export get_galprop_axis
 export get_name_list
 export get_spectra
 export get_scatter
+export count_R
+export count_Ekin
 export Particle
 
 using FITSIO
 using Printf
+
+mutable struct Particle
+  dNdE::Array{T,1} where {T<:Real}
+  R::Array{T,1} where {T<:Real}
+  dNdR::Array{T,1} where {T<:Real}
+  Ekin::Array{T,1} where {T<:Real}
+  A::Int
+  Z::Int
+end
+
+function Base.:copy(p::Particle)
+  Particle(copy(p.dNdE), copy(p.R), copy(p.dNdR), copy(p.Ekin), p.A, p.Z)
+end
 
 """
     get_axis(header::FITSHeader, index::Int)
@@ -88,15 +103,31 @@ function get_spectra(hdu::ImageHDU)
     index = @sprintf "%03d" i
     iZ=header["NUCZ$index"]
     iA=header["NUCA$index"]
-    m0 = iA == 0 ? 0.511e-3 : 0.9382
     idnde = map((e,f)->f / e^2 / 1e3, eaxis, spectra[:,i]) # MeV^2 cm^-2 sr^-1 s^-1 MeV^-1 -> cm^-2 sr^-1 s^-1 GeV^-1
-    ip=@. sqrt((eaxis+m0)^2-m0^2)
-    ir=ip*iA/iZ # [GV]
-    idndr=@. idnde*(ip/sqrt(ip^2+m0^2))*(iZ/iA) # cm^-2 sr^-1 s^-1 GV^-1
-    result[nlist[i]] = Particle(idnde,ir,idndr,eaxis,iA,iZ)
+    tmp = Particle(idnde, Array{Real,1}(), Array{Real,1}(), eaxis, iA, iZ)
+    count_R(tmp)
+    result[nlist[i]] = tmp
   end
 
-  return result
+  result
+end
+
+function count_R(particle::Particle)
+  m0 = particle.A == 0 ? 0.511e-3 : 0.9382
+  E = @. particle.Ekin + m0
+  p = @. sqrt(E^2 - m0^2)
+  particle.R = p * particle.A / particle.Z # [GV]
+  particle.dNdR = @. particle.dNdE * p/E * particle.Z/particle.A # cm^-2 sr^-1 s^-1 GV^-1
+  particle
+end
+
+function count_Ekin(particle::Particle)
+  m0 = particle.A == 0 ? 0.511e-3 : 0.9382
+  p = @. particle.R * particle.Z / particle.A # [GeV]
+  E = @. sqrt(p^2 + m0^2)
+  particle.Ekin = @. E - m0 # [GV]
+  particle.dNdE = @. particle.dNdR * E/p * particle.A/particle.Z # cm^-2 sr^-1 s^-1 GeV^-1
+  particle
 end
 
 function get_scatter(density::Array{T,4} where {T<:Real}, axis::Dict{String,Array{T,1}} where {T<:Real}, p::Real)
@@ -123,14 +154,4 @@ function get_scatter(density::Array{T,4} where {T<:Real}, axis::Dict{String,Arra
 
   return scatters
 end
-
-mutable struct Particle
-  dNdE::Array{T,1} where {T<:Real}
-  R::Array{T,1} where {T<:Real}
-  dNdR::Array{T,1} where {T<:Real}
-  Ekin::Array{T,1} where {T<:Real}
-  A::Int
-  Z::Int
-end
-
 end  # FITSUtils
