@@ -101,7 +101,7 @@ function get_spectra(hdu::ImageHDU)
   eaxis = map(x->10^x / 1e3, get_axis(header, 3)) # [GeV]
   for i in 1:length(nlist)
     index = @sprintf "%03d" i
-    iZ=header["NUCZ$index"]
+    iZ=abs(header["NUCZ$index"])
     iA=header["NUCA$index"]
     idnde = map((e,f)->f / e^2 / 1e3, eaxis, spectra[:,i]) # MeV^2 cm^-2 sr^-1 s^-1 MeV^-1 -> cm^-2 sr^-1 s^-1 GeV^-1
     tmp = Particle(idnde, Array{Real,1}(), Array{Real,1}(), eaxis, iA, iZ)
