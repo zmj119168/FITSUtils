@@ -82,13 +82,14 @@ end
 
 # Arguments
 * `hdu`: the hdu for GALPROP output.
+* `r`: the place of spectra,default to sun=8.3.
 """
-function get_spectra(hdu::ImageHDU)
+function get_spectra(hdu::ImageHDU;r::Real = 8.3)
   header = read_header(hdu)
   data = read(hdu)
   nlist = get_name_list(header, 4)
 
-  rsun = 8.3
+  rsun = r
   xaxis = get_axis(header, 1)
   ilow = findlast(x->x<rsun, xaxis)
   iup = ilow + 1
