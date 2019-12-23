@@ -9,7 +9,10 @@ export get_scatter
 export count_R
 export count_Ekin
 export Particle
+export den_Particle
+export get_density
 
+using Interpolations
 using FITSIO
 using Printf
 
@@ -20,6 +23,11 @@ mutable struct Particle
   Ekin::Array{T,1} where {T<:Real}
   A::Int
   Z::Int
+end
+
+mutable struct den_Particle
+  density::Array{T,1} where {T<:Real}
+  radius::Array{T,1} where {T<:Real}
 end
 
 function Base.:copy(p::Particle)
@@ -110,6 +118,34 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.3)
     result[nlist[i]] = tmp
   end
 
+  result
+end
+
+
+function get_density(hdu::ImageHDU;low::Real = 10)
+  c=2.99792458e10
+  header = read_header(hdu)
+  data = read(hdu)
+  nlist = get_name_list(header, 4)
+  xaxis = get_axis(header, 1)
+  result = Dict{String,den_Particle}()
+  eaxis = map(x->10^x / 1e3, get_axis(header, 3)) # [GeV]
+  int=log(low):1e-4:7
+  for n in 1:length(nlist)
+    index = @sprintf "%03d" n
+    iZ=abs(header["NUCZ$index"])
+    iA=header["NUCA$index"]
+    m0 =iA == 0 ? 0.511e-3 : 0.9382   
+    de= Array{Real,1}(undef, 0)
+    for r in 1:length(xaxis)
+      flux = @. data[r,1,:,n] / eaxis^2 / 1e3               # MeV^2 cm^-2 sr^-1 s^-1 MeV^-1 -> cm^-2 sr^-1 s^-1 GeV^-1     
+      logene = log.(eaxis)
+      spec = extrapolate(interpolate((range(logene[1],last(logene),length=length(logene)),), log.(flux), Gridded(Linear())), Line())
+      fun12(e)=4e12pi*exp(spec(log(e)))/(c*sqrt(1-(m0/(m0+e))^2))
+      de=vcat(de,sum([(fun12(exp(i))+fun12(exp(i+di)))*(exp(i+di)-exp(i))/2 for i in int]))   
+    end
+    result[nlist[n]] = den_Particle(de, xaxis)
+  end
   result
 end
 
