@@ -110,7 +110,7 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.3)
   eaxis = map(x->10^x / 1e3, get_axis(header, 3)) # [GeV]
   for i in 1:length(nlist)
     index = @sprintf "%03d" i
-    iZ=abs(header["NUCZ$index"])
+    iZ=header["NUCZ$index"]
     iA=header["NUCA$index"]
     idnde = map((e,f)->f / e^2 / 1e3, eaxis, spectra[:,i]) # MeV^2 cm^-2 sr^-1 s^-1 MeV^-1 -> cm^-2 sr^-1 s^-1 GeV^-1
     tmp = Particle(idnde, Array{Real,1}(), Array{Real,1}(), eaxis, iA, iZ)
@@ -153,17 +153,17 @@ function count_R(particle::Particle)
   m0 = particle.A == 0 ? 0.511e-3 : 0.9382
   E = @. particle.Ekin + m0
   p = @. sqrt(E^2 - m0^2)
-  particle.R = p * particle.A / particle.Z # [GV]
-  particle.dNdR = @. particle.dNdE * p/E * particle.Z/particle.A # cm^-2 sr^-1 s^-1 GV^-1
+  particle.R = p * particle.A / abs(particle.Z) # [GV]
+  particle.dNdR = @. particle.dNdE * p/E * abs(particle.Z)/particle.A # cm^-2 sr^-1 s^-1 GV^-1
   particle
 end
 
 function count_Ekin(particle::Particle)
   m0 = particle.A == 0 ? 0.511e-3 : 0.9382
-  p = @. particle.R * particle.Z / particle.A # [GeV]
+  p = @. particle.R * abs(particle.Z) / particle.A # [GeV]
   E = @. sqrt(p^2 + m0^2)
   particle.Ekin = @. E - m0 # [GV]
-  particle.dNdE = @. particle.dNdR * E/p * particle.A/particle.Z # cm^-2 sr^-1 s^-1 GeV^-1
+  particle.dNdE = @. particle.dNdR * E/p * particle.A/abs(particle.Z) # cm^-2 sr^-1 s^-1 GeV^-1
   particle
 end
 
