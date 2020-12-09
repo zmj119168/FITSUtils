@@ -130,7 +130,8 @@ function get_density(hdu::ImageHDU;low::Real = 10)
   xaxis = get_axis(header, 1)
   result = Dict{String,den_Particle}()
   eaxis = map(x->10^x / 1e3, get_axis(header, 3)) # [GeV]
-  int=log(low):1e-4:7
+  di=1e-3
+  int=log(low):di:7
   for n in 1:length(nlist)
     index = @sprintf "%03d" n
     iZ=abs(header["NUCZ$index"])
@@ -140,7 +141,7 @@ function get_density(hdu::ImageHDU;low::Real = 10)
     for r in 1:length(xaxis)
       flux = @. data[r,1,:,n] / eaxis^2 / 1e3               # MeV^2 cm^-2 sr^-1 s^-1 MeV^-1 -> cm^-2 sr^-1 s^-1 GeV^-1     
       logene = log.(eaxis)
-      spec = extrapolate(interpolate((range(logene[1],last(logene),length=length(logene)),), log.(flux), Gridded(Linear())), Line())
+      spec = extrapolate(interpolate((logene,), log.(flux), Gridded(Linear())), Line())
       fun12(e)=4e12pi*exp(spec(log(e)))/(c*sqrt(1-(m0/(m0+e))^2))
       de=vcat(de,sum([(fun12(exp(i))+fun12(exp(i+di)))*(exp(i+di)-exp(i))/2 for i in int]))   
     end
