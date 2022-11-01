@@ -44,6 +44,7 @@ Get the grid array of a specified axis from an hdu header
 * `index`:  the index of specfied axis.
 """
 function get_axis(header::FITSHeader, ind::Int)
+   #nom uniform grid need to use bin/print_grid + galdef
   return map(i->header["CRVAL$ind"] + header["CDELT$ind"] * (i - 1), 1:header["NAXIS$ind"])
 end
 
@@ -154,17 +155,17 @@ function count_R(particle::Particle)
   m0 = particle.A == 0 ? 0.511e-3 : 0.9382
   E = @. particle.Ekin + m0
   p = @. sqrt(E^2 - m0^2)
-  particle.R = p * particle.A / abs(particle.Z) # [GV]
-  particle.dNdR = @. particle.dNdE * p/E * abs(particle.Z)/particle.A # cm^-2 sr^-1 s^-1 GV^-1
+  particle.R = p * max(particle.A,1) / abs(particle.Z) # [GV]
+  particle.dNdR = @. particle.dNdE * p/E * abs(particle.Z)/max(particle.A,1) # cm^-2 sr^-1 s^-1 GV^-1
   particle
 end
 
 function count_Ekin(particle::Particle)
   m0 = particle.A == 0 ? 0.511e-3 : 0.9382
-  p = @. particle.R * abs(particle.Z) / particle.A # [GeV]
+  p = @. particle.R * abs(particle.Z) / max(particle.A,1) # [GeV]
   E = @. sqrt(p^2 + m0^2)
   particle.Ekin = @. E - m0 # [GV]
-  particle.dNdE = @. particle.dNdR * E/p * particle.A/abs(particle.Z) # cm^-2 sr^-1 s^-1 GeV^-1
+  particle.dNdE = @. particle.dNdR * E/p * max(particle.A,1)/abs(particle.Z) # cm^-2 sr^-1 s^-1 GeV^-1
   particle
 end
 
