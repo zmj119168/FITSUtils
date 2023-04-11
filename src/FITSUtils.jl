@@ -84,6 +84,22 @@ function get_name(header, ind::Int)
   return header["NAME$index"]
 end
 
+
+function get_57grid(file::FITS)
+   result = Dict{String,Array{T,1} where {T<:Real}}()
+   if length(file)==5
+   result["GAL-X"]=read(file[2],"GAL-R")
+   result["GAL-Z"]=read(file[3],"GAL-Z")
+   result["Energy"]=read(file[4],"Energy")
+   else
+   result["GAL-X"]=read(file[2],"GAL-X")
+   result["GAL-Y"]=read(file[3],"GAL-Y")
+   result["GAL-Z"]=read(file[4],"GAL-Z")
+   result["Energy"]=read(file[5],"Energy")
+   end
+  result
+end
+
 """
     get_spectra(hdu::ImageHDU)
 
@@ -92,23 +108,40 @@ end
 # Arguments
 * `hdu`: the hdu for GALPROP output.
 * `r`: the place of spectra,default to sun=8.3.
+* `file`: supply if needed special grid in GAL57
 """
-function get_spectra(hdu::ImageHDU;r::Real = 8.3)
+function get_spectra(hdu::ImageHDU;r::Real = 8.3,grid::Dict{}=Dict([("none", [])]))
   header = read_header(hdu)
+  if haskey(header, "GRID-Z") && !haskey(grid, "Energy") && header["GRID-Z"]!="linear"
+    throw("The the grid is nonlinear, use the function get_spectra(FITS('/xx/xx/xx')) instead!!")
+  end
   data = read(hdu)
-  nlist = get_name_list(header, 4)
-
+  dimension=header["NAXIS"]==4 ? 2 : 3
+  nlist = get_name_list(header, header["NAXIS"])
   rsun = r
-  xaxis = get_axis(header, 1)
+  xaxis = !haskey(grid, "Energy") ? get_axis(header, 1) : grid["GAL-X"]
   ilow = findlast(x->x<rsun, xaxis)
   iup = ilow + 1
   wlow = (xaxis[iup] - rsun) / (xaxis[iup] - xaxis[ilow])
   wup = (rsun - xaxis[ilow]) / (xaxis[iup] - xaxis[ilow])
 
-  spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,1,:,:], data[iup,1,:,:])
+  if dimension==2
+   zaxis = !haskey(grid, "Energy") ? get_axis(header, 2) : grid["GAL-Z"]
+   zlow = findlast(z->z<=0, zaxis)
+   eaxis = !haskey(grid, "Energy") ? map(x->10^x, get_axis(header, 3)) : grid["Energy"]
+   eaxis =  eaxis/1e3 # [GeV]
+   spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,zlow,:,:], data[iup,zlow,:,:])
+  else
+   yaxis = !haskey(grid, "Energy") ? get_axis(header, 2) : grid["GAL-Y"]
+   ylow = findlast(y->y<=0, yaxis)
+   zaxis = !haskey(grid, "Energy") ? get_axis(header, 3) : grid["GAL-Z"]
+   zlow = findlast(z->z<=0, zaxis)
+   eaxis = !haskey(grid, "Energy") ? map(x->10^x, get_axis(header, 4)) : grid["Energy"]
+   eaxis =  eaxis/1e3 # [GeV]
+   spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,ylow,zlow,:,:], data[iup,ylow,zlow,:,:])
+  end
   result = Dict{String,Particle}()
 
-  eaxis = map(x->10^x / 1e3, get_axis(header, 3)) # [GeV]
   for i in 1:length(nlist)
     index = @sprintf "%03d" i
     iZ=header["NUCZ$index"]
@@ -122,6 +155,10 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.3)
   result
 end
 
+function get_spectra(file::FITS;r::Real = 8.3)
+  grid=get_57grid(file)
+  get_spectra(file[1],r=r,grid=grid)
+end
 
 function get_density(hdu::ImageHDU;low::Real = 10)
   c=2.99792458e10
