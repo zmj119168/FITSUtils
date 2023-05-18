@@ -127,7 +127,8 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.3,grid::Dict{}=Dict([("none", [])
 
   if dimension==2
    zaxis = !haskey(grid, "Energy") ? get_axis(header, 2) : grid["GAL-Z"]
-   zlow = findlast(z->z<=0, zaxis)
+   zlow = findfirst(z->z>=0, zaxis)
+   zlow=zlow==nothing ? 1 : zlow
    eaxis = !haskey(grid, "Energy") ? map(x->10^x, get_axis(header, 3)) : grid["Energy"]
    eaxis =  eaxis/1e3 # [GeV]
    spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,zlow,:,:], data[iup,zlow,:,:])
@@ -135,7 +136,8 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.3,grid::Dict{}=Dict([("none", [])
    yaxis = !haskey(grid, "Energy") ? get_axis(header, 2) : grid["GAL-Y"]
    ylow = findlast(y->y<=0, yaxis)
    zaxis = !haskey(grid, "Energy") ? get_axis(header, 3) : grid["GAL-Z"]
-   zlow = findlast(z->z<=0, zaxis)
+   zlow = findfirst(z->z>=0, zaxis)
+   zlow=zlow==nothing ? 1 : zlow
    eaxis = !haskey(grid, "Energy") ? map(x->10^x, get_axis(header, 4)) : grid["Energy"]
    eaxis =  eaxis/1e3 # [GeV]
    spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,ylow,zlow,:,:], data[iup,ylow,zlow,:,:])
