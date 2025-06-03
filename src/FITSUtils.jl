@@ -3,6 +3,7 @@ VERSION < v"0.1.0" && __precompile__()
 module FITSUtils
 export get_axis
 export get_galprop_axis
+export get_57grid
 export get_name_list
 export get_spectra
 export get_scatter
@@ -87,15 +88,9 @@ end
 
 function get_57grid(file::FITS)
    result = Dict{String,Array{T,1} where {T<:Real}}()
-   if length(file)==5
-   result["GAL-X"]=read(file[2],"GAL-R")
-   result["GAL-Z"]=read(file[3],"GAL-Z")
-   result["Energy"]=read(file[4],"Energy")
-   else
-   result["GAL-X"]=read(file[2],"GAL-X")
-   result["GAL-Y"]=read(file[3],"GAL-Y")
-   result["GAL-Z"]=read(file[4],"GAL-Z")
-   result["Energy"]=read(file[5],"Energy")
+   for i in 2:length(file)-1
+    k=FITSIO.colnames(file[i])[1]
+    result[k=="GAL-R" ? "GAL-X" : k]=read(file[i],k)
    end
   result
 end
@@ -107,10 +102,10 @@ end
 
 # Arguments
 * `hdu`: the hdu for GALPROP output.
-* `r`: the place of spectra,default to sun=8.3.
+* `r`: the place of spectra,default to sun=8.5.
 * `file`: supply if needed special grid in GAL57
 """
-function get_spectra(hdu::ImageHDU;r::Real = 8.3,grid::Dict{}=Dict([("none", [])]))
+function get_spectra(hdu::ImageHDU;r::Real = 8.5,grid::Dict{}=Dict([("none", [])]))
   header = read_header(hdu)
   if haskey(header, "GRID-Z") && !haskey(grid, "Energy") && header["GRID-Z"]!="linear"
     throw("The the grid is nonlinear, use the function get_spectra(FITS('/xx/xx/xx')) instead!!")
@@ -121,6 +116,7 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.3,grid::Dict{}=Dict([("none", [])
   rsun = r
   xaxis = !haskey(grid, "Energy") ? get_axis(header, 1) : grid["GAL-X"]
   ilow = findlast(x->x<rsun, xaxis)
+  ilow=ilow==nothing ? 1 : ilow
   iup = ilow + 1
   wlow = (xaxis[iup] - rsun) / (xaxis[iup] - xaxis[ilow])
   wup = (rsun - xaxis[ilow]) / (xaxis[iup] - xaxis[ilow])
@@ -157,7 +153,7 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.3,grid::Dict{}=Dict([("none", [])
   result
 end
 
-function get_spectra(file::FITS;r::Real = 8.3)
+function get_spectra(file::FITS;r::Real = 8.5)
   grid=get_57grid(file)
   get_spectra(file[1],r=r,grid=grid)
 end
