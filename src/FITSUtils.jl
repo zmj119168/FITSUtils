@@ -130,10 +130,16 @@ function get_spectra(hdu::ImageHDU;r::Real = 8.5,grid::Dict{}=Dict([("none", [])
    spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,zlow,:,:], data[iup,zlow,:,:])
   else
    yaxis = !haskey(grid, "Energy") ? get_axis(header, 2) : grid["GAL-Y"]
-   ylow = findlast(y->y<=0, yaxis)
+   ylow = findfirst(y->y>=0, yaxis)
+   if ylow>1
+      ylow=abs(yaxis[ylow])>abs(yaxis[ylow-1]) ? ylow-1 : ylow
+   end
    zaxis = !haskey(grid, "Energy") ? get_axis(header, 3) : grid["GAL-Z"]
    zlow = findfirst(z->z>=0, zaxis)
    zlow=zlow==nothing ? 1 : zlow
+   if zlow>1
+      zlow=abs(zaxis[zlow])>abs(zaxis[zlow-1]) ? zlow-1 : zlow
+   end
    eaxis = !haskey(grid, "Energy") ? map(x->10^x, get_axis(header, 4)) : grid["Energy"]
    eaxis =  eaxis/1e3 # [GeV]
    spectra = map((flow, fup)->flow * wlow + fup * wup, data[ilow,ylow,zlow,:,:], data[iup,ylow,zlow,:,:])
